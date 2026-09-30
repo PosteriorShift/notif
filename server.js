@@ -4,7 +4,6 @@ import { saveToken, removeToken, tokensForUsers, allTokens, users } from "./toke
 
 const app = express();
 
-// CORS — first, before everything
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
@@ -17,26 +16,22 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "1mb" }));
 initFirebase();
 
-// Health
 app.get("/", (req, res) => res.json({ ok: true, service: "vw-push", time: Date.now() }));
 
-// Register a device token for a username.
 app.post("/api/fcm/register", (req, res) => {
   const { username, token } = req.body || {};
   if (!username || !token) return res.status(400).json({ error: "username and token required" });
   const count = saveToken(username, token);
-  console.log(`[register] ${username} → total devices for this user: ${count}`);
+  console.log(`[register] ${username} → ${count} device(s)`);
   res.json({ ok: true, count });
 });
 
-// Unregister a device.
 app.post("/api/fcm/unregister", (req, res) => {
   const { token } = req.body || {};
   if (token) removeToken(token);
   res.json({ ok: true });
 });
 
-// Who is available as a recipient?
 app.get("/api/users", (req, res) => {
   if (req.headers["x-notify-secret"] !== process.env.NOTIFY_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -44,14 +39,10 @@ app.get("/api/users", (req, res) => {
   res.json({ users: users() });
 });
 
-// Send a push.
-// Body: { title, body, priority?, to?: "vinay" | ["vinay","editor"] }
-// No "to" → everyone.
 app.post("/api/notify", async (req, res) => {
   if (req.headers["x-notify-secret"] !== process.env.NOTIFY_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-
   const { title, body, priority = "high", to } = req.body || {};
   if (!title || !body) return res.status(400).json({ error: "title and body required" });
 
@@ -68,14 +59,13 @@ app.post("/api/notify", async (req, res) => {
     targets.map((t) => sendPush(t, title, body, priority))
   );
 
-  // Purge dead tokens
   results.forEach((r, i) => {
     if (r.status === "rejected") {
       const code = r.reason?.errorInfo?.code || r.reason?.code || "";
-      if (
-        code === "messaging/registration-token-not-registered" ||
-        code === "messaging/invalid-registration-token"
-      ) removeToken(targets[i]);
+      if (code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token") {
+        removeToken(targets[i]);
+      }
     }
   });
 
