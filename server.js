@@ -3,6 +3,18 @@ import { initFirebase, sendPush } from "./firebase.js";
 import { saveToken, allTokens, removeToken } from "./tokens.js";
 
 const app = express();
+
+// --- CORS (must be first, before body parser and routes) ---
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Notify-Secret");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
+
+// Body parser
 app.use(express.json({ limit: "1mb" }));
 
 // Initialize Firebase ONCE at startup — Render keeps this process alive.
